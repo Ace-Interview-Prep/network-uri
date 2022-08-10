@@ -1,6 +1,8 @@
 The network-uri package
 =======================
 
+** I Galen, forked this cuz holy crap there's some weird behavior
+
 This package provides facilities for parsing and unparsing URIs, and creating
 and resolving relative URI references, closely following the URI spec, IETF
 RFC 3986 [1].
