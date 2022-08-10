@@ -473,6 +473,8 @@ unreservedChar = (:[]) <$> satisfy isUnreserved
 --               / path-rootless
 --               / path-empty
 
+
+-- TODO(galen): change this to be Bool -> URIParser URI 
 uri :: URIParser URI
 uri =
     do  { us <- try uscheme
