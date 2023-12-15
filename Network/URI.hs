@@ -149,6 +149,7 @@ import Control.DeepSeq (NFData(rnf), deepseq)
 import Data.Char (ord, chr, isHexDigit, toLower, toUpper, digitToInt)
 import Data.Bits ((.|.),(.&.),shiftL,shiftR)
 import Data.List (unfoldr, isPrefixOf, isSuffixOf)
+import Data.Maybe (fromJust, isJust)
 import Numeric (showIntAtBase)
 
 import Language.Haskell.TH.Syntax (Lift(..))
@@ -230,6 +231,17 @@ unlessEmpty  f  x = f x
 instance NFData URI where
     rnf (URI s a p q f)
         = s `deepseq` a `deepseq` p `deepseq` q `deepseq` f `deepseq` ()
+
+-- Note we should have a Read instance for older GHCs, but this version
+-- is implemented with readsPrec which is new with 7.6.0.
+#if __GLASGOW_HASKELL__ >= 760
+instance Read URI where
+         readsPrec _ v
+            | isJust mUri = return (fromJust mUri, "")
+            | otherwise = []
+            where
+                mUri = parseURI v
+#endif
 
 -- |Type for authority value within a URI
 data URIAuth = URIAuth
@@ -977,19 +989,25 @@ uriAuthToString userinfomap
 isAllowedInURI :: Char -> Bool
 isAllowedInURI c = isReserved c || isUnreserved c || c == '%' -- escape char
 
--- | Returns 'True' if the character is allowed unescaped in a URI.
+-- | Returns 'True' if the character is allowed unescaped in a finished URI (unless it is a %
+-- character, which is allowed). This is probably not what you want. Consider using
+-- isUnescapedInURIComponent if you want to percent-encode a component before adding it into a
+-- URI.
 --
 -- >>> escapeURIString isUnescapedInURI "http://haskell.org:80?some_param=true&other_param=їґ"
 -- "http://haskell.org:80?some_param=true&other_param=%D1%97%D2%91"
 isUnescapedInURI :: Char -> Bool
 isUnescapedInURI c = isReserved c || isUnreserved c
 
--- | Returns 'True' if the character is allowed unescaped in a URI component.
+-- | Returns 'True' if the character is allowed unescaped in a URI component, i.e. it is both
+-- allowed in a URI and is not a reserved separator like `/`, `?`, and so on. You might use
+-- this, with escapeURIString, to percent-encode a string before placing it in a URI field.
 --
--- >>> escapeURIString isUnescapedInURIComponent "http://haskell.org:80?some_param=true&other_param=їґ"
+-- >>> escapeURIString isUnescapedInURIComponent
+-- "http://haskell.org:80?some_param=true&other_param=їґ"
 -- "http%3A%2F%2Fhaskell.org%3A80%3Fsome_param%3Dtrue%26other_param%3D%D1%97%D2%91"
 isUnescapedInURIComponent :: Char -> Bool
-isUnescapedInURIComponent c = not (isReserved c || not (isUnescapedInURI c))
+isUnescapedInURIComponent c = not (isReserved c) && isUnescapedInURI c
 
 ------------------------------------------------------------
 --  Escape sequence handling
@@ -1419,9 +1437,12 @@ unreserved = isUnreserved
 scheme :: URI -> String
 scheme = orNull init . uriScheme
 
+runShowS :: ShowS -> String
+runShowS s = s ""
+
 {-# DEPRECATED authority "use uriAuthority, and note changed functionality" #-}
 authority :: URI -> String
-authority = dropss . ($"") . uriAuthToString id . uriAuthority
+authority = dropss . runShowS . uriAuthToString id . uriAuthority
     where
         -- Old-style authority component does not include leading '//'
         dropss ('/':'/':s) = s
