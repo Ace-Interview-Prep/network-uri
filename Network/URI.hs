@@ -133,6 +133,7 @@ module Network.URI
     , escapeString
     , reserved, unreserved
     , scheme, authority, path, query, fragment
+    , uri
     ) where
 
 import Text.ParserCombinators.Parsec
