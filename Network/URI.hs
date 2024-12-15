@@ -140,7 +140,7 @@ import Text.ParserCombinators.Parsec
     ( GenParser, ParseError
     , parse, (<?>), try
     , option, many1, count, notFollowedBy
-    , char, satisfy, oneOf, string, eof
+    , char, satisfy, string, eof
     , unexpected
     )
 
@@ -462,7 +462,7 @@ isSubDelims c =
     _ -> False
 
 subDelims :: URIParser String
-subDelims = (:[]) <$> oneOf "!$&'()*+,;="
+subDelims = (:[]) <$> satisfy isSubDelims
 
 --  RFC3986, section 2.3
 --
@@ -548,7 +548,7 @@ uauthority =
 
 userinfo :: URIParser String
 userinfo =
-    do  { uu <- many (uchar ";:&=+$,")
+    do  { uu <- many (uchars ";:&=+$,")
         ; _ <- char '@'
         ; return (concat uu ++"@")
         }
@@ -779,38 +779,38 @@ slashSegment =
 
 segment :: URIParser String
 segment =
-    do  { ps <- many pchar
+    do  { ps <- many pchars
         ; return $ concat ps
         }
 
 segmentNz :: URIParser String
 segmentNz =
-    do  { ps <- many1 pchar
+    do  { ps <- many1 pchars
         ; return $ concat ps
         }
 
 segmentNzc :: URIParser String
 segmentNzc =
-    do  { ps <- many1 (uchar "@")
+    do  { ps <- many1 (uchars "@")
         ; return $ concat ps
         }
 
-pchar :: URIParser String
-pchar = uchar ":@"
+pchars :: URIParser String
+pchars = uchars ":@"
 
 -- helper function for pchar and friends
-uchar :: String -> URIParser String
-uchar extras =
-        unreservedChar
+uchars :: String -> URIParser String
+uchars extras =
+    many1 (satisfy (\c -> isUnreserved c
+                       || isSubDelims c
+                       || c `elem` extras))
     <|> escaped
-    <|> subDelims
-    <|> do { c <- oneOf extras ; return [c] }
 
 --  RFC3986, section 3.4
 
 uquery :: URIParser String
 uquery =
-    do  { ss <- many $ uchar (":@"++"/?")
+    do  { ss <- many $ uchars (":@"++"/?")
         ; return $ '?':concat ss
         }
 
@@ -818,7 +818,7 @@ uquery =
 
 ufragment :: URIParser String
 ufragment =
-    do  { ss <- many $ uchar (":@"++"/?")
+    do  { ss <- many $ uchars (":@"++"/?")
         ; return $ '#':concat ss
         }
 
